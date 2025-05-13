@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>考试题库系统</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container">
+        <a class="navbar-brand" href="#">考试题库系统</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="#" @click="currentView = 'home'">首页</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" @click="currentView = 'questionBank'">题库</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" @click="currentView = 'bookManagement'">书籍管理</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" @click="currentView = 'examMode'">考试模式</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mt-4">
+      <!-- 首页 -->
+      <div v-if="currentView === 'home'" class="text-center">
+        <h1 class="mb-4">考试题库系统</h1>
+        <div class="row justify-content-center mt-4">
+          <div class="col-md-4 mb-4">
+            <div class="card h-100">
+              <div class="card-body text-center">
+                <i class="bi bi-book" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h3 class="mt-3">书籍管理</h3>
+                <p>上传和管理书籍，批量生成考试题目</p>
+                <button @click="currentView = 'bookManagement'" class="btn btn-primary">前往管理</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4 mb-4">
+            <div class="card h-100">
+              <div class="card-body text-center">
+                <i class="bi bi-file-text" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h3 class="mt-3">单篇文本</h3>
+                <p>上传单个文本内容，快速生成题目</p>
+                <div class="d-grid gap-2">
+                  <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#uploadTextCollapse">
+                    上传文本
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4 mb-4">
+            <div class="card h-100">
+              <div class="card-body text-center">
+                <i class="bi bi-mortarboard" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h3 class="mt-3">考试模式</h3>
+                <p>开始在线考试，测试您的知识</p>
+                <button @click="currentView = 'examMode'" class="btn btn-primary">开始考试</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 文本上传折叠面板 -->
+        <div class="collapse mt-4" id="uploadTextCollapse">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">上传单篇文本</h5>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <textarea class="form-control" v-model="uploadText" rows="6" placeholder="粘贴文本内容..."></textarea>
+              </div>
+              <button @click="uploadTextContent" class="btn btn-primary mt-3" :disabled="isUploading">
+                {{ isUploading ? '上传中...' : '上传文本' }}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 已上传内容表格 -->
+        <div class="row mt-5">
+          <div class="col-md-12">
+            <div class="card">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">已上传内容</h5>
+                <button class="btn btn-sm btn-primary" @click="loadTexts">刷新</button>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>内容预览</th>
+                        <th>上传时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="text in texts" :key="text._id">
+                        <td class="text-truncate-2" style="max-width: 400px;">{{ text.content.substring(0, 100) }}...</td>
+                        <td>{{ formatDate(text.createdAt) }}</td>
+                        <td>
+                          <span class="badge" :class="text.processed ? 'bg-success' : 'bg-warning'">
+                            {{ text.processed ? '已处理' : '处理中' }}
+                          </span>
+                        </td>
+                        <td>
+                          <button @click="viewTextQuestions(text._id)" class="btn btn-sm btn-info">查看题目</button>
+                        </td>
+                      </tr>
+                      <tr v-if="texts.length === 0">
+                        <td colspan="4" class="text-center py-3">暂无上传内容</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- 书籍管理 -->
+      <div v-if="currentView === 'bookManagement'">
+        <h2>书籍资料管理</h2>
+        <p class="text-muted">通过手机APP扫描或手动上传的书籍将显示在此处，您可以为完整书籍生成考试题目。</p>
+        
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0">创建新书籍</h5>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <label class="form-label">书籍标题</label>
+                  <input type="text" class="form-control" v-model="newBook.title" placeholder="输入书籍标题">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">作者 (可选)</label>
+                  <input type="text" class="form-control" v-model="newBook.author" placeholder="输入作者名称">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">描述 (可选)</label>
+                  <textarea class="form-control" v-model="newBook.description" rows="2" placeholder="简短描述书籍内容"></textarea>
+                </div>
+                <button class="btn btn-primary" @click="createBook" :disabled="!newBook.title">创建书籍</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0">上传页面</h5>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <label class="form-label">选择书籍</label>
+                  <select class="form-select" v-model="selectedBookId">
+                    <option value="">-- 请选择书籍 --</option>
+                    <option v-for="book in books" :key="book._id" :value="book._id">{{ book.title }}</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">页码</label>
+                  <input type="number" class="form-control" v-model="newPage.pageNumber" min="1" placeholder="输入页码">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">页面内容</label>
+                  <textarea class="form-control" v-model="newPage.content" rows="6" placeholder="粘贴或输入页面内容"></textarea>
+                </div>
+                <button class="btn btn-primary" @click="uploadPage" :disabled="!canUploadPage">上传页面</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">书籍列表</h5>
+            <button class="btn btn-sm btn-primary" @click="loadBooks">刷新</button>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>书籍标题</th>
+                    <th>作者</th>
+                    <th>页面数</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="book in books" :key="book._id">
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author || '-' }}</td>
+                    <td>{{ book.processedPages }} / {{ book.totalPages || '?' }}</td>
+                    <td>
+                      <span class="badge" :class="book.questionsGenerated ? 'bg-success' : 'bg-secondary'">
+                        {{ book.questionsGenerated ? '已生成题目' : '待处理' }}
+                      </span>
+                    </td>
+                    <td>{{ formatDate(book.createdAt) }}</td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <button class="btn btn-info" @click="viewBookPages(book._id)">查看页面</button>
+                        <button class="btn btn-primary" 
+                                @click="generateBookQuestions(book._id)"
+                                :disabled="book.questionsGenerated || book.isGenerating || book.processedPages < 1">
+                          {{ book.isGenerating ? '处理中...' : '生成题目' }}
+                        </button>
+                        <button class="btn btn-danger" @click="deleteBook(book._id)">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="books.length === 0">
+                    <td colspan="6" class="text-center py-3">暂无书籍数据</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 书籍页面列表模态框 -->
+        <div class="modal fade" id="bookPagesModal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">书籍页面列表</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div v-if="bookPages.length === 0" class="text-center py-4">
+                  此书籍暂无页面数据
+                </div>
+                <div v-else>
+                  <div v-for="page in bookPages" :key="page._id" class="card mb-3">
+                    <div class="card-header d-flex justify-content-between">
+                      <span>第 {{ page.pageNumber }} 页</span>
+                      <button class="btn btn-sm btn-danger" @click="deletePage(page._id)">删除</button>
+                    </div>
+                    <div class="card-body">
+                      <p class="mb-0" style="white-space: pre-wrap;">{{ page.content }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- 题库页面 -->
+      <div v-if="currentView === 'questionBank'">
+        <h2>题库管理</h2>
+        
+        <div class="btn-group mb-3">
+          <button @click="filterQuestions('all')" class="btn" :class="questionFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'">全部</button>
+          <button @click="filterQuestions('single_choice')" class="btn" :class="questionFilter === 'single_choice' ? 'btn-primary' : 'btn-outline-primary'">单选题</button>
+          <button @click="filterQuestions('multiple_choice')" class="btn" :class="questionFilter === 'multiple_choice' ? 'btn-primary' : 'btn-outline-primary'">多选题</button>
+          <button @click="filterQuestions('fill_blank')" class="btn" :class="questionFilter === 'fill_blank' ? 'btn-primary' : 'btn-outline-primary'">填空题</button>
+        </div>
+
+        <div class="question-list">
+          <div v-for="(question, index) in filteredQuestions" :key="question._id" class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <div>
+                {{ getQuestionTypeText(question.type) }} #{{ index + 1 }}
+              </div>
+              <div>
+                <button @click="editQuestion(question)" class="btn btn-sm btn-warning me-2">编辑</button>
+                <button @click="deleteQuestion(question._id)" class="btn btn-sm btn-danger">删除</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="card-text">{{ question.text }}</p>
+              
+              <!-- 选择题选项 -->
+              <div v-if="question.type !== 'fill_blank'">
+                <div v-for="option in question.options" :key="option.id" class="form-check">
+                  <input class="form-check-input" type="checkbox" :checked="isCorrectAnswer(question, option)" disabled>
+                  <label class="form-check-label">
+                    {{ option.id }}. {{ option.text }}
+                  </label>
+                </div>
+              </div>
+              
+              <!-- 填空题答案 -->
+              <div v-if="question.type === 'fill_blank'" class="mt-2">
+                <strong>答案:</strong> {{ Array.isArray(question.answer) ? question.answer.join('、') : question.answer }}
+              </div>
+              
+              <!-- 解析 -->
+              <div v-if="question.explanation" class="mt-3">
+                <strong>解析:</strong> {{ question.explanation }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 考试模式 -->
+      <div v-if="currentView === 'examMode'">
+        <div v-if="!examStarted" class="text-center">
+          <h2>考试模式</h2>
+          <div class="row justify-content-center mt-5">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-body">
+                  <h5 class="card-title">开始新考试</h5>
+                  
+                  <div class="form-group">
+                    <label>试卷题量</label>
+                    <div class="row g-3 align-items-center">
+                      <div class="col-auto">
+                        <label class="form-label">单选题:</label>
+                      </div>
+                      <div class="col-auto">
+                        <input type="number" v-model="examSettings.singleChoiceCount" class="form-control" min="0">
+                      </div>
+                      
+                      <div class="col-auto">
+                        <label class="form-label">多选题:</label>
+                      </div>
+                      <div class="col-auto">
+                        <input type="number" v-model="examSettings.multipleChoiceCount" class="form-control" min="0">
+                      </div>
+                      
+                      <div class="col-auto">
+                        <label class="form-label">填空题:</label>
+                      </div>
+                      <div class="col-auto">
+                        <input type="number" v-model="examSettings.fillBlankCount" class="form-control" min="0">
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button @click="startExam" class="btn btn-primary mt-4" :disabled="!canStartExam">
+                    开始考试
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div v-else>
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>考试中</h2>
+            <div>
+              <button @click="endExam" class="btn btn-danger">结束考试</button>
+            </div>
+          </div>
+          
+          <!-- 考试界面 -->
+          <div class="exam-container">
+            <!-- 进度指示器 -->
+            <div class="progress mb-4">
+              <div class="progress-bar" :style="{ width: examProgress + '%' }"></div>
+            </div>
+            
+            <div v-if="currentQuestion" class="card">
+              <div class="card-header">
+                第 {{ currentQuestionIndex + 1 }}/{{ examQuestions.length }} 题
+                ({{ getQuestionTypeText(currentQuestion.type) }})
+              </div>
+              <div class="card-body">
+                <p>{{ currentQuestion.text }}</p>
+                
+                <!-- 单选题 -->
+                <div v-if="currentQuestion.type === 'single_choice'">
+                  <div v-for="option in currentQuestion.options" :key="option.id" class="form-check">
+                    <input class="form-check-input" 
+                           type="radio" 
+                           :name="'question-'+currentQuestionIndex" 
+                           :id="'option-'+option.id"
+                           :value="option.id"
+                           v-model="userAnswers[currentQuestionIndex]">
+                    <label class="form-check-label" :for="'option-'+option.id">
+                      {{ option.id }}. {{ option.text }}
+                    </label>
+                  </div>
+                </div>
+                
+                <!-- 多选题 -->
+                <div v-if="currentQuestion.type === 'multiple_choice'">
+                  <div v-for="option in currentQuestion.options" :key="option.id" class="form-check">
+                    <input class="form-check-input" 
+                           type="checkbox" 
+                           :id="'option-'+currentQuestionIndex+'-'+option.id"
+                           :value="option.id"
+                           v-model="userAnswers[currentQuestionIndex]">
+                    <label class="form-check-label" :for="'option-'+currentQuestionIndex+'-'+option.id">
+                      {{ option.id }}. {{ option.text }}
+                    </label>
+                  </div>
+                </div>
+                
+                <!-- 填空题 -->
+                <div v-if="currentQuestion.type === 'fill_blank'">
+                  <div class="form-group">
+                    <input type="text" class="form-control" v-model="userAnswers[currentQuestionIndex]" placeholder="请输入答案">
+                  </div>
+                </div>
+              </div>
+                            <div class="card-footer d-flex justify-content-between">
+                <button @click="prevQuestion" class="btn btn-secondary" :disabled="currentQuestionIndex === 0">上一题</button>
+                <button @click="nextQuestion" class="btn btn-primary" v-if="currentQuestionIndex < examQuestions.length - 1">下一题</button>
+                <button @click="submitExam" class="btn btn-success" v-else>提交试卷</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 考试结果 -->
+        <div v-if="examFinished" class="mt-5">
+          <div class="card">
+            <div class="card-header bg-primary text-white">
+              <h3 class="m-0">考试结果</h3>
+            </div>
+            <div class="card-body">
+              <h4 class="text-center mb-4">得分: {{ examScore }}分 (总分: {{ examTotalScore }}分)</h4>
+              
+              <div v-for="(question, index) in examQuestions" :key="index" class="mb-4 p-3" :class="{'bg-light': index % 2 === 0}">
+                <div class="d-flex">
+                  <span class="badge" :class="questionResultClass(index)">
+                    {{ questionIsCorrect(index) ? '正确' : '错误' }}
+                  </span>
+                  <span class="ms-2">第 {{ index + 1 }} 题 ({{ getQuestionTypeText(question.type) }})</span>
+                </div>
+                
+                <p class="mt-2">{{ question.text }}</p>
+                
+                <!-- 选择题选项 -->
+                <div v-if="question.type !== 'fill_blank'">
+                  <div v-for="option in question.options" :key="option.id" class="d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" 
+                          :checked="isOptionInUserAnswer(index, option.id)" 
+                          disabled>
+                      <label class="form-check-label" :class="getOptionClass(question, option, index)">
+                        {{ option.id }}. {{ option.text }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 填空题答案 -->
+                <div v-if="question.type === 'fill_blank'" class="mt-2">
+                  <div>您的答案: <span :class="{'text-danger': !questionIsCorrect(index)}">{{ userAnswers[index] || '(未作答)' }}</span></div>
+                  <div>正确答案: <span class="text-success">{{ Array.isArray(question.answer) ? question.answer.join('、') : question.answer }}</span></div>
+                </div>
+                
+                <!-- 解析 -->
+                <div v-if="question.explanation" class="mt-3 border-top pt-2">
+                  <strong>解析:</strong> {{ question.explanation }}
+                </div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <button @click="startNewExam" class="btn btn-primary">再来一次</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 编辑问题的模态框 -->
+      <div class="modal fade" id="editQuestionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">编辑问题</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" v-if="editingQuestion">
+              <div class="form-group mb-3">
+                <label>问题类型</label>
+                <select class="form-control" v-model="editingQuestion.type">
+                  <option value="single_choice">单选题</option>
+                  <option value="multiple_choice">多选题</option>
+                  <option value="fill_blank">填空题</option>
+                </select>
+              </div>
+              
+              <div class="form-group mb-3">
+                <label>问题文本</label>
+                <textarea class="form-control" v-model="editingQuestion.text" rows="3"></textarea>
+              </div>
+              
+              <!-- 选择题选项 -->
+              <div v-if="editingQuestion.type !== 'fill_blank'">
+                <label>选项</label>
+                <div v-for="(option, index) in editingQuestion.options" :key="index" class="input-group mb-2">
+                  <span class="input-group-text">{{ option.id }}</span>
+                  <input type="text" class="form-control" v-model="option.text">
+                  <button class="btn btn-outline-danger" @click="removeOption(index)">删除</button>
+                </div>
+                
+                <button class="btn btn-outline-primary mb-3" @click="addOption">添加选项</button>
+                
+                <div class="form-group mb-3">
+                  <label>正确答案</label>
+                  <div v-if="editingQuestion.type === 'single_choice'">
+                    <select class="form-control" v-model="editingQuestion.answer">
+                      <option v-for="option in editingQuestion.options" :key="option.id" :value="option.id">
+                        {{ option.id }}
+                      </option>
+                    </select>
+                  </div>
+                  <div v-else>
+                    <div v-for="option in editingQuestion.options" :key="option.id" class="form-check">
+                      <input class="form-check-input" type="checkbox" 
+                            :id="'edit-option-'+option.id" 
+                            :value="option.id" 
+                            v-model="editingQuestion.answer">
+                      <label class="form-check-label" :for="'edit-option-'+option.id">
+                        {{ option.id }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 填空题答案 -->
+              <div v-if="editingQuestion.type === 'fill_blank'" class="form-group mb-3">
+                <label>正确答案 (多个答案以逗号分隔)</label>
+                <input type="text" class="form-control" v-model="fillBlankAnswerText">
+              </div>
+              
+              <div class="form-group mb-3">
+                <label>解析</label>
+                <textarea class="form-control" v-model="editingQuestion.explanation" rows="3"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="button" class="btn btn-primary" @click="saveQuestion">保存</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.45/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
+
