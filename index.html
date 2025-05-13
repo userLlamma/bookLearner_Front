@@ -261,7 +261,7 @@
                   <div v-for="page in bookPages" :key="page._id" class="card mb-3">
                     <div class="card-header d-flex justify-content-between">
                       <span>第 {{ page.pageNumber }} 页</span>
-                      <button class="btn btn-sm btn-danger" @click="deletePage(page._id)">删除</button>
+                      <button class="btn btn-sm btn-danger" @click="deletePage(currentViewingBookId, page.pageNumber)">删除</button>
                     </div>
                     <div class="card-body">
                       <p class="mb-0" style="white-space: pre-wrap;">{{ page.content }}</p>

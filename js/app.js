@@ -22,6 +22,7 @@ const app = createApp({
     });
     const bookPages = ref([]);
     const bookPagesModal = ref(null);
+    const currentViewingBookId = ref(null); // 用于存储当前查看页面的书籍ID
     
     // 文本上传
     const uploadText = ref('');
@@ -168,13 +169,29 @@ const app = createApp({
       }
     }
     async function viewBookPages(bookId) {
+      currentViewingBookId.value = bookId; // 保存当前书籍ID
       try {
+        // 根据 API 文档，接口 URL 是 /api/books/:id/pages
         const response = await axios.get(`${API_BASE_URL}/api/books/${bookId}/pages`);
-        bookPages.value = response.data.sort((a, b) => a.pageNumber - b.pageNumber);
-        bookPagesModal.value.show();
+        // API 返回的数据结构中，页面列表在 response.data.pages
+        bookPages.value = response.data.pages.sort((a, b) => a.pageNumber - b.pageNumber);
+        // 确保 bookPagesModal.value 已经被正确初始化
+        if (bookPagesModal.value && typeof bookPagesModal.value.show === 'function') {
+          bookPagesModal.value.show();
+        } else {
+          // 如果尚未初始化，尝试获取并初始化
+          const modalElement = document.getElementById('bookPagesModal');
+          if (modalElement) {
+            bookPagesModal.value = new bootstrap.Modal(modalElement);
+            bookPagesModal.value.show();
+          } else {
+            console.error('Book pages modal element not found.');
+            alert('无法打开页面列表模态框。');
+          }
+        }
       } catch (error) {
         console.error('Error loading book pages:', error);
-        alert('加载书籍页面失败');
+        alert('加载书籍页面失败: ' + (error.response?.data?.message || error.message));
       }
     }
     async function generateBookQuestions(bookId) {
@@ -223,26 +240,34 @@ const app = createApp({
       }
     }
 
-    async function deletePage(pageId) {
-      if (!confirm('确定要删除这个页面吗？此操作不可撤销。')) {
+    // API 文档: DELETE /api/books/:id/pages/:pageNumber
+    async function deletePage(bookId, pageNumber) {
+      if (!bookId || !pageNumber) {
+        alert('缺少书籍ID或页码，无法删除页面。');
         return;
       }
-      
+      if (!confirm(`确定要删除书籍ID ${bookId} 的第 ${pageNumber} 页吗？此操作不可撤销。`)) {
+        return;
+      }
+
       try {
-        await axios.delete(`${API_BASE_URL}/api/pages/${pageId}`);
+        await axios.delete(`${API_BASE_URL}/api/books/${bookId}/pages/${pageNumber}`);
         alert('页面删除成功');
+        
         // 刷新当前显示的页面列表
-        const bookId = bookPages.value.length > 0 ? bookPages.value[0].bookId : null;
-        if (bookId) {
-          viewBookPages(bookId);
+        if (currentViewingBookId.value) { // 使用保存的 bookId 重新加载页面
+            viewBookPages(currentViewingBookId.value);
         } else {
-          bookPagesModal.value.hide();
+            // 如果没有 currentViewingBookId，可能需要关闭模态框或给出提示
+            if (bookPagesModal.value && typeof bookPagesModal.value.hide === 'function') {
+                bookPagesModal.value.hide();
+            }
         }
-        // 刷新书籍列表
+        // 刷新书籍列表（因为 processedPages 可能变化）
         loadBooks();
       } catch (error) {
         console.error('Error deleting page:', error);
-        alert('删除页面失败');
+        alert('删除页面失败: ' + (error.response?.data?.message || error.message));
       }
     }
 
