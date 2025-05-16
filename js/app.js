@@ -198,7 +198,11 @@ const app = createApp({
       const book = books.value.find(b => b._id === bookId);
       if (!book) return;
       
-      if (!confirm(`确定要为《${book.title}》生成考试题目吗？此过程可能需要几分钟时间，并且可能会生成大量题目。`)) {
+      let confirmMessage = `确定要为《${book.title}》生成考试题目吗？`;
+      if (book.questionsGenerated && book.generationStatus === 'Success') { // 或只检查 book.questionsGenerated
+          confirmMessage = `《${book.title}》已有题目。确定要重新生成吗？这将删除所有现有题目并基于当前所有页面内容生成新的题目。`;
+      }
+      if (!confirm(confirmMessage)) {
         return;
       }
       
@@ -435,24 +439,63 @@ const app = createApp({
           multipleChoiceCount: examSettings.value.multipleChoiceCount,
           fillBlankCount: examSettings.value.fillBlankCount
         });
-        
-        examQuestions.value = response.data.data;
-        
-        // 初始化用户答案
-        userAnswers.value = examQuestions.value.map(q => {
-          if (q.type === 'multiple_choice') {
-            return [];
-          }
-          return '';
-        });
-        
-        currentQuestionIndex.value = 0;
-        examStarted.value = true;
-        examFinished.value = false;
-        examScore.value = 0;
-      } catch (error) {
-        console.error('Error generating exam:', error);
-        alert('生成试卷失败，请确保题库中有足够的题目');
+
+        // 后端响应示例: { success: true, data: [题目对象数组] }
+        // 关键点1: 确认 response.data.data 是不是真的是一个问题数组
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+            examQuestions.value = response.data.data;
+
+            if (examQuestions.value.length === 0) {
+                // 如果获取到的题目数组为空
+                alert('未能获取到任何考题，请检查题库或所选题目数量。');
+                // examStarted.value = false; // 确保不进入考试界面
+                return; // 提前退出，不继续执行
+            }
+
+            // 初始化用户答案数组
+            userAnswers.value = examQuestions.value.map(q => {
+              // 确保 q 和 q.type 是有效的，防止 .map 中出错
+              if (q && typeof q.type !== 'undefined') { 
+                if (q.type === 'multiple_choice') {
+                  return [];
+                }
+                return '';
+              }
+              console.warn('Encountered invalid question object during userAnswers initialization:', q);
+              return ''; // 为无效题目提供默认答案结构
+            });
+
+            currentQuestionIndex.value = 0;
+            examFinished.value = false; // 确保考试完成状态被重置
+            examScore.value = 0;      // 重置分数
+
+            // 关键点2: 设置 examStarted 为 true 以切换视图
+            examStarted.value = true; 
+            // console.log('examStarted set to true. examQuestions count:', examQuestions.value.length);
+
+        } else {
+            // API请求成功了，但是返回的数据结构不对，或者 success: false
+            console.error('从/api/exam/generate获取的考题数据格式不正确或未成功:', response.data);
+            alert(`获取考题失败：${response.data?.message || '服务器返回数据格式错误。'}`);
+            // examStarted.value = false; // 确保不进入考试界面
+        }
+
+      } catch (error) { // 这个catch块处理axios请求本身的错误，例如网络错误、404、500等
+        console.error('Error in startExam function (full error object):', error);
+        let errorMessage = '生成试卷失败，请重试。';
+        if (error.response) {
+            if (error.response.status === 404) {
+                errorMessage = '考试生成失败：找不到对应的服务接口 (404 Not Found)。请检查后端API。';
+            } else {
+                errorMessage = `生成试卷失败：服务器错误 ${error.response.status}。${error.response.data?.message || '请确保题库中有足够的题目。'}`;
+            }
+        } else if (error.request) {
+            errorMessage = '生成试卷失败：无法连接到服务器，请检查网络和后端服务状态。';
+        } else {
+            errorMessage = `生成试卷时发生未知错误：${error.message}`;
+        }
+        alert(errorMessage);
+        // examStarted.value = false; // 确保出错时不进入考试界面
       }
     }
     

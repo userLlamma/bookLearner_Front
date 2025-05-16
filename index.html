@@ -229,8 +229,8 @@
                         <button class="btn btn-info" @click="viewBookPages(book._id)">查看页面</button>
                         <button class="btn btn-primary" 
                                 @click="generateBookQuestions(book._id)"
-                                :disabled="book.questionsGenerated || book.isGenerating || book.processedPages < 1">
-                          {{ book.isGenerating ? '处理中...' : '生成题目' }}
+                                :disabled="book.isGenerating || book.processedPages < 1">
+                          {{ book.isGenerating ? '处理中...' : (book.questionsGenerated && book.generationStatus === 'Success' ? '重新生成题目' : '生成题目') }}
                         </button>
                         <button class="btn btn-danger" @click="deleteBook(book._id)">删除</button>
                       </div>
